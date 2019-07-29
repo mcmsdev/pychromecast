@@ -1,14 +1,18 @@
 #!/usr/bin/python3
 import sys
+import argparse
 import time
 import logging
+import signal
 
 import pychromecast
 import pychromecast.controllers.dashcast_fork as dashcast
 
+def timeout_func(signum, frame):
+    print("Chromecast not responding")
+    sys.exit(2)
 
-def main(chromecast_ip, server_ip, debug):
-    print(server_ip)
+def main(chromecast_ip, url, debug):
     if debug:
         logging.basicConfig(level=logging.DEBUG)
         
@@ -31,39 +35,42 @@ def main(chromecast_ip, server_ip, debug):
     cast.register_handler(d)
 
 
-    print(cast.device)
-    print(cast.status)
-    print(cast.media_controller.status)
-    time.sleep(1)
+    #print(cast.device)
+    #print(cast.status)
+    #print(cast.media_controller.status)
+
+    #time.sleep(1)
 
     if not cast.is_idle:
-        print
         print("Killing current running app")
         cast.quit_app()
         time.sleep(5)
     
-
-    time.sleep(1)
-    
-    url = 'http://' + server_ip + '/tv/instructions.php'
-    print(url)
+    #time.sleep(1)
+        
     d.load_url(url, True)
-    
-    if debug:
-        time.sleep(2)
+
+    # Need to wait 2 seconds after url is loaded before testing if idle
+    time.sleep(2)
     
     if cast.is_idle:
-        print('Failed to cast pairing instructions page')
+        print('Failed to cast url')
         sys.exit(1)
     sys.exit(0)
 
 if __name__== '__main__':
-    if len(sys.argv) < 3:
-        print('Usage:  call with Chromecast IP and server IP')
+    parser = argparse.ArgumentParser(description='Cast a URL to a chromecast device')
+    parser.add_argument('--deviceip', required=True)
+    parser.add_argument('--url', required=True)
+    parser.add_argument('-d', '--debug', action='store_const', const=True)
+    args = vars(parser.parse_args())
+
+    signal.signal(signal.SIGALRM, timeout_func)
+    timeout = 20
+    signal.alarm(timeout)
+
+    try:
+        main(args['deviceip'], args['url'], args['debug'])
+    except Exception as e:
+        print('Exiting because of exception: %s' % e)
         sys.exit(1)
-    print(sys.argv[1])
-    server_ip = sys.argv[2]
-    debug = True
-    #if (len(sys.argv) == 3) and sys.argv[2] == 'd':
-    #    debug = True
-    main(sys.argv[1], server_ip, debug)
