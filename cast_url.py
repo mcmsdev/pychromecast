@@ -6,6 +6,7 @@ import logging
 
 import pychromecast
 import pychromecast.controllers.dashcast_fork as dashcast
+from pychromecast.config import APP_DASHCAST_FORK
 
 has_timed_out = False
 
@@ -56,7 +57,7 @@ def main(chromecast_ip, url, debug):
     if cast.is_idle:
         print('Failed to cast url')
         sys.exit(1)
-    elif cast.app_id != "660BC918":
+    elif cast.app_id != APP_DASHCAST_FORK:
         print(cast.app_display_name, cast.app_id)
         sys.exit(1)
     sys.exit(0)
