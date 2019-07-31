@@ -3,20 +3,18 @@ import sys
 import argparse
 import time
 import logging
-import signal
 
 import pychromecast
 import pychromecast.controllers.dashcast_fork as dashcast
 
-def timeout_func(signum, frame):
-    print("Chromecast not responding")
-    sys.exit(2)
+has_timed_out = False
 
 def main(chromecast_ip, url, debug):
     if debug:
         logging.basicConfig(level=logging.DEBUG)
         
     cast = None
+    global has_timed_out
 
     try: 
         cast = pychromecast.Chromecast(chromecast_ip)
@@ -30,10 +28,12 @@ def main(chromecast_ip, url, debug):
 
     pychromecast.IGNORE_CEC.append('*')
     
-    cast.wait()
+    timeout = 5
+    # If cast.wait times out it will return False
+    has_timed_out = not cast.wait(timeout)
+
     d = dashcast.DashCastForkController()
     cast.register_handler(d)
-
 
     #print(cast.device)
     #print(cast.status)
@@ -56,6 +56,9 @@ def main(chromecast_ip, url, debug):
     if cast.is_idle:
         print('Failed to cast url')
         sys.exit(1)
+    elif cast.app_id != "660BC918":
+        print(cast.app_display_name, cast.app_id)
+        sys.exit(1)
     sys.exit(0)
 
 if __name__== '__main__':
@@ -65,12 +68,11 @@ if __name__== '__main__':
     parser.add_argument('-d', '--debug', action='store_const', const=True)
     args = vars(parser.parse_args())
 
-    signal.signal(signal.SIGALRM, timeout_func)
-    timeout = 20
-    signal.alarm(timeout)
-
     try:
         main(args['deviceip'], args['url'], args['debug'])
     except Exception as e:
         print('Exiting because of exception: %s' % e)
+        if has_timed_out:
+            print('cast.wait() timeout')
+            sys.exit(2)
         sys.exit(1)

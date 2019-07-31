@@ -328,7 +328,7 @@ class Chromecast(object):
         """
         if not self.socket_client.isAlive():
             self.socket_client.start()
-        self.status_event.wait(timeout=timeout)
+        return self.status_event.wait(timeout=timeout)
 
     def connect(self):
         """ Connect to the chromecast.
