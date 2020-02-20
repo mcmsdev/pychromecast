@@ -3,18 +3,28 @@ import sys
 import argparse
 import time
 import logging
+import signal
 
 import pychromecast
 import pychromecast.controllers.dashcast_fork as dashcast
 from pychromecast.config import APP_DASHCAST_FORK
 
 has_timed_out = False
+cast = None
+
+def response_timeout(signum, frame):
+    global cast
+    try:
+        cast.quit_app()
+    except:
+        pass
+    raise Exception("Waited more 5 seconds for a response from instructions page")
 
 def main(chromecast_ip, url, debug):
     if debug:
         logging.basicConfig(level=logging.DEBUG)
         
-    cast = None
+    global cast
     global has_timed_out
 
     try: 
@@ -48,14 +58,25 @@ def main(chromecast_ip, url, debug):
         time.sleep(5)
     
     #time.sleep(1)
-        
-    d.load_url(url, True)
+
+    casting_instructions = False
+    if (url.endswith('instructions.php')):
+        casting_instructions = True
+
+    d.load_url(url, not casting_instructions)
 
     # Need to wait 2 seconds after url is loaded before testing if idle
-    time.sleep(2)
+    time.sleep(2.5)
+
+    if casting_instructions:
+        signal.signal(signal.SIGALRM, response_timeout)
+        signal.alarm(5)
+        while cast.status.status_text != 'Successfully loaded page!':
+            time.sleep(1)
     
     if cast.is_idle:
         print('Failed to cast url')
+        cast.quit_app()
         sys.exit(1)
     elif cast.app_id != APP_DASHCAST_FORK:
         print(cast.app_display_name, cast.app_id)
