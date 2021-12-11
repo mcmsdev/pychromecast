@@ -9,6 +9,7 @@ import pychromecast
 import pychromecast.controllers.dashcast_fork as dashcast
 from pychromecast.config import APP_DASHCAST_FORK
 
+
 has_timed_out = False
 cast = None
 
@@ -42,6 +43,8 @@ def main(chromecast_ip, url, debug):
     timeout = 5
     # If cast.wait times out it will return False
     has_timed_out = not cast.wait(timeout)
+
+    # if has_timed_out an exception should be raised?
 
     d = dashcast.DashCastForkController()
     cast.register_handler(d)
