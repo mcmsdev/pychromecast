@@ -74,14 +74,19 @@ def main(chromecast_ip, url, debug):
         while cast.status.status_text != 'Successfully loaded page!':
             time.sleep(1)
     
+    exit_status = 0
+
     if cast.is_idle:
         print('Failed to cast url')
         cast.quit_app()
-        sys.exit(1)
+        exit_status = 1
     elif cast.app_id != APP_DASHCAST_FORK:
         print(cast.app_display_name, cast.app_id)
-        sys.exit(1)
-    sys.exit(0)
+        exit_status = 1
+
+    cast.disconnect()
+
+    sys.exit(exit_status)
 
 if __name__== '__main__':
     parser = argparse.ArgumentParser(description='Cast a URL to a chromecast device')
