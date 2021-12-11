@@ -201,6 +201,8 @@ class SocketClient(threading.Thread):
 
         self.source_id = "sender-0"
         self.stop = threading.Event()
+        # socketpair used to interrupt the worker thread
+        self.socketpair = socket.socketpair()
 
         self.app_namespaces = []
         self.destination_id = None
@@ -429,6 +431,12 @@ class SocketClient(threading.Thread):
     def disconnect(self):
         """ Disconnect socket connection to Chromecast device """
         self.stop.set()
+        try:
+            # Write to the socket to interrupt the worker thread
+            self.socketpair[1].send(b"x")
+        except socket.error:
+            # The socketpair may already be closed during shutdown, ignore it
+            pass
 
     def register_handler(self, handler):
         """ Register a new namespace handler. """
@@ -492,15 +500,25 @@ class SocketClient(threading.Thread):
         self.heartbeat_controller.reset()
         self._force_recon = False
         logging.debug("Thread started...")
-        while not self.stop.is_set():
+        try:
+            while not self.stop.is_set():
+                if self.run_once(timeout=POLL_TIME_BLOCKING) == 1:
+                    break
+        except Exception:
+            self.logger.exception(
+                ("[%s(%s):%s] Unhandled exception in worker thread"),
+                self.fn or "",
+                self.host,
+                self.port,
+            )
+            raise
+        finally:
+            self.logger.debug("Thread done...")
 
-            if self.run_once() == 1:
-                break
+            # Clean up
+            self._cleanup()
 
-        # Clean up
-        self._cleanup()
-
-    def run_once(self):
+    def run_once(self, timeout=POLL_TIME_NON_BLOCKING):
         """
         Use run_once() in your own main loop after you
         receive something on the socket (get_socket()).
@@ -513,8 +531,18 @@ class SocketClient(threading.Thread):
         except ChromecastConnectionError:
             return 1
 
-        # poll the socket
-        can_read, _, _ = select.select([self.socket], [], [], self.polltime)
+        # poll the socket, as well as the socketpair to allow us to be interrupted
+        rlist = [self.socket, self.socketpair[0]]
+        try:
+            can_read, _, _ = select.select(rlist, [], [], timeout)
+        except (ValueError, OSError) as exc:
+            self.logger.error(
+                "[%s(%s):%s] Error in select call: %s",
+                self.fn or "",
+                self.host,
+                self.port,
+                exc,
+            )
 
         # read messages from chromecast
         message = data = None
