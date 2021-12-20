@@ -63,8 +63,8 @@ def main(chromecast_ip, url, debug):
     #time.sleep(1)
 
     casting_instructions = False
-    if (url.endswith('instructions.php')):
-        casting_instructions = True
+    # if (url.endswith('instructions.php')):
+    #    casting_instructions = True
 
     d.load_url(url, not casting_instructions)
 
