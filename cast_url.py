@@ -9,7 +9,6 @@ import pychromecast
 import pychromecast.controllers.dashcast_fork as dashcast
 from pychromecast.config import APP_DASHCAST_FORK
 
-
 has_timed_out = False
 cast = None
 
@@ -21,7 +20,7 @@ def response_timeout(signum, frame):
         pass
     raise Exception("Waited more 5 seconds for a response from instructions page")
 
-def main(chromecast_ip, url, debug):
+def main(chromecast_ip, url, no_force, debug):
     if debug:
         logging.basicConfig(level=logging.DEBUG)
         
@@ -44,8 +43,6 @@ def main(chromecast_ip, url, debug):
     # If cast.wait times out it will return False
     has_timed_out = not cast.wait(timeout)
 
-    # if has_timed_out an exception should be raised?
-
     d = dashcast.DashCastForkController()
     cast.register_handler(d)
 
@@ -62,44 +59,43 @@ def main(chromecast_ip, url, debug):
     
     #time.sleep(1)
 
-    casting_instructions = False
-    # if (url.endswith('instructions.php')):
-    #    casting_instructions = True
+    force_load = True
+    if no_force:
+        force_load = False
 
-    d.load_url(url, not casting_instructions)
+    d.load_url(url, force_load)
 
     # Need to wait 2 seconds after url is loaded before testing if idle
     time.sleep(2.5)
 
-    if casting_instructions:
+    if not force_load:
         signal.signal(signal.SIGALRM, response_timeout)
         signal.alarm(5)
         while cast.status.status_text != 'Successfully loaded page!':
             time.sleep(1)
     
-    exit_status = 0
-
     if cast.is_idle:
         print('Failed to cast url')
         cast.quit_app()
-        exit_status = 1
+        sys.exit(1)
     elif cast.app_id != APP_DASHCAST_FORK:
         print(cast.app_display_name, cast.app_id)
-        exit_status = 1
+        sys.exit(1)
 
     cast.disconnect()
 
-    sys.exit(exit_status)
+    sys.exit(0)
 
 if __name__== '__main__':
     parser = argparse.ArgumentParser(description='Cast a URL to a chromecast device')
     parser.add_argument('--deviceip', required=True)
     parser.add_argument('--url', required=True)
+    parser.add_argument('-n', '--no-force', action='store_const', const=True)
     parser.add_argument('-d', '--debug', action='store_const', const=True)
     args = vars(parser.parse_args())
 
     try:
-        main(args['deviceip'], args['url'], args['debug'])
+        main(args['deviceip'], args['url'], args['no_force'], args['debug'])
     except Exception as e:
         print('Exiting because of exception: %s' % e)
         if has_timed_out:
