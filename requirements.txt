@@ -1,4 +1,5 @@
 requests >=2.0, <2.2.3
 protobuf >=3.9, <3.20
 zeroconf == 0.28.5
+ifaddr == 0.1.7
 casttube == 0.2.1
